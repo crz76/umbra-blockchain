@@ -142,16 +142,16 @@ fn main() {
         if url.starts_with("/api/send") {
             let parts: Vec<&str> = url.split('?').collect();
             if parts.len() > 1 {
-                let mut priv_key_hex = "";
-                let mut recipient = "";
+                let mut priv_key_hex = String::new();
+                let mut recipient = String::new();
                 let mut amount: u64 = 0;
 
                 for kv in parts[1].split('&') {
                     let kv_arr: Vec<&str> = kv.split('=').collect();
                     if kv_arr.len() == 2 {
                         let val = urlencoding::decode(kv_arr[1]).unwrap_or_default().into_owned();
-                        if kv_arr[0] == "priv" { priv_key_hex = Box::leak(val.into_boxed_str()); }
-                        if kv_arr[0] == "to" { recipient = Box::leak(val.into_boxed_str()); }
+                        if kv_arr[0] == "priv" { priv_key_hex = val; }
+                        if kv_arr[0] == "to" { recipient = val; }
                         if kv_arr[0] == "amount" { amount = val.parse().unwrap_or(0); }
                     }
                 }
@@ -170,7 +170,7 @@ fn main() {
 
                         let tx = Transaction {
                             sender,
-                            recipient: recipient.to_string(),
+                            recipient,
                             amount,
                             signature: signature_hex,
                         };
@@ -189,7 +189,6 @@ fn main() {
             continue;
         }
 
-        // Interface Web Moderne avec Dashboard par Compte et Distinction Mineur/Utilisateur
         let html = r#"<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -267,7 +266,6 @@ fn main() {
         
         for (let i = 0; i < wallets.length; i++) {
             let w = wallets[i];
-            // Récupérer le solde en direct depuis le serveur
             let res = await fetch(`/api/balance?address=${w.address}`);
             let data = await res.json();
             
@@ -303,7 +301,7 @@ fn main() {
         
         let res = await fetch(`/api/send?priv=${encodeURIComponent(priv)}&to=${encodeURIComponent(to)}&amount=${amount}`);
         let data = await res.json();
-        document.getElementById('statusMsginnerText = data.message;
+        document.getElementById('statusMsg').innerText = data.message;
         loadWalletsUI();
     }
 
