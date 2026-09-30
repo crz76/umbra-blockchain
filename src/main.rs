@@ -208,8 +208,8 @@ fn main() {
                     let kv_arr: Vec<&str> = kv.split('=').collect();
                     if kv_arr.len() == 2 {
                         let val = urlencoding::decode(kv_arr[1]).unwrap_or_default().into_owned();
-                        if kv_arr[0] == "priv" { priv_key_hex = val; }
-                        if kv_arr[0] == "to" { recipient = val; }
+                        if kv_arr[0] == "priv" { priv_key_hex = val.clone(); }
+                        if kv_arr[0] == "to" { recipient = val.clone(); }
                         if kv_arr[0] == "amount" { amount = val.parse().unwrap_or(0); }
                     }
                 }
@@ -292,7 +292,7 @@ fn main() {
         .copy-btn { background: #334155; padding: 4px 8px; font-size: 0.8rem; border-radius: 4px; width: auto; margin: 0; cursor: pointer; }
         .copy-btn:hover { background: var(--accent); color: #000; }
         
-        .block-item, .tx-item { background: #090d16; border: 1px solid var(--border-color); padding: 15px; border-radius: 10px; margin-bottom: 12px; }
+        .block-item { background: #090d16; border: 1px solid var(--border-color); padding: 15px; border-radius: 10px; margin-bottom: 12px; }
         .hidden { display: none !important; }
         .badge { background: #1e293b; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; color: var(--accent); }
     </style>
@@ -302,8 +302,8 @@ fn main() {
         <header>
             <h1>🌑 Umbra Network</h1>
             <div id="navMenu" class="nav-tabs hidden">
-                <button class="tab-btn active" onclick="switchTab('wallet')">Portefeuille</button>
-                <button class="tab-btn" onclick="switchTab('explorer')">Explorateur de Blocs</button>
+                <button class="tab-btn active" onclick="switchTab('wallet', event)">Portefeuille</button>
+                <button class="tab-btn" onclick="switchTab('explorer', event)">Explorateur de Blocs</button>
             </div>
         </header>
         
@@ -405,7 +405,7 @@ fn main() {
             currentPrivKey = priv;
             showDashboard(priv, data.address);
         } else {
-            document.getElementById('authErrorミュニ' || 'authError').innerText = "Clé privée invalide. Vérifiez votre saisie.";
+            document.getElementById('authError').innerText = "Clé privée invalide. Vérifiez votre saisie.";
         }
     }
 
@@ -444,16 +444,16 @@ fn main() {
         document.getElementById('authError').innerText = '';
     }
 
-    function switchTab(tabName) {
+    function switchTab(tabName, event) {
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
         if (tabName === 'wallet') {
             document.getElementById('walletTab').classList.remove('hidden');
             document.getElementById('explorerTab').classList.add('hidden');
-            event.target.classList.add('active');
+            if (event && event.target) event.target.classList.add('active');
         } else {
             document.getElementById('walletTab').classList.add('hidden');
             document.getElementById('explorerTab').classList.remove('hidden');
-            event.target.classList.add('active');
+            if (event && event.target) event.target.classList.add('active');
             loadBlocks();
         }
     }
