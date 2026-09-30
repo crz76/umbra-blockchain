@@ -71,7 +71,7 @@ impl Blockchain {
         let prev_block = self.chain.last().unwrap();
         let mut txs = self.pending_transactions.clone();
         
-        // Récompense de minage automatique pour le serveur
+        // Récompense de minage automatique pour le système
         txs.push(Transaction {
             sender: "SYSTEM_REWARD".to_string(),
             recipient: miner_address.to_string(),
@@ -98,14 +98,14 @@ impl Blockchain {
 fn main() {
     let blockchain = Arc::new(Mutex::new(Blockchain::new()));
 
-    // ⛏️ Minage automatique en arrière-plan toutes les 30 secondes par le serveur
+    // ⛏️ Minage automatique en arrière-plan toutes les 30 secondes
     let bc_clone = Arc::clone(&blockchain);
     thread::spawn(move || {
         loop {
             thread::sleep(Duration::from_secs(30));
             let mut bc = bc_clone.lock().unwrap();
-            let server_miner = "umbra_system_autofaucet_address";
-            bc.mine_pending_transactions(server_miner);
+            let default_miner = "umbra_system_autofaucet_address";
+            bc.mine_pending_transactions(default_miner);
             println!("🔄 [Automatique] Un nouveau bloc a été miné par le serveur !");
         }
     });
@@ -182,7 +182,7 @@ fn main() {
                         let mut bc = blockchain.lock().unwrap();
                         bc.pending_transactions.push(tx);
 
-                        let resp = Response::from_string(r#"{"status": "success", "message": "Transaction ajoutée et en attente de minage automatique !"}"#);
+                        let resp = Response::from_string(r#"{"status": "success", "message": "Transaction ajoutée à la file d'attente !"}"#);
                         let _ = request.respond(resp);
                         continue;
                     }
@@ -203,14 +203,14 @@ fn main() {
         .container { max-width: 900px; margin: auto; }
         h1 { color: #38bdf8; text-align: center; margin-bottom: 30px; }
         .card { background: #1e293b; border: 1px solid #334155; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        input, button { width: 100%; padding: 12px; margin-top: 8px; margin-bottom: 15px; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 6px; box-sizing: border-box; }
+        input, select, button { width: 100%; padding: 12px; margin-top: 8px; margin-bottom: 15px; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 6px; box-sizing: border-box; }
         button { background: #0284c7; font-weight: bold; cursor: pointer; transition: background 0.2s; }
         button:hover { background: #0369a1; }
-        .account-box { background: #0f172a; border: 1px solid #3b82f6; padding: 20px; border-radius: 8px; margin-top: 20px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); }
+        .account-box { background: #0f172a; border: 1px solid #3b82f6; padding: 15px; border-radius: 8px; margin-top: 15px; }
         .mono { font-family: monospace; font-size: 0.85em; color: #38bdf8; word-break: break-all; }
         .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75em; font-weight: bold; background: #0284c7; color: white; }
-        .balance { font-size: 1.3em; color: #34d399; font-weight: bold; }
-        .transfer-section { margin-top: 15px; border-top: 1px dashed #334155; padding-top: 15px; }
+        .balance { font-size: 1.2em; color: #34d399; font-weight: bold; }
+        .transfer-section { margin-top: 15px; padding-top: 15px; border-top: 1px dashed #334155; }
     </style>
 </head>
 <body>
@@ -218,15 +218,11 @@ fn main() {
         <h1>🌑 Umbra Blockchain - Dashboard</h1>
         
         <div class="card">
-            <h3>📂 Gestion des Comptes Actifs</h3>
-            <p style="color: #94a3b8; font-size: 0.9em;">Créez ou gérez votre compte utilisateur. Le minage s'effectue automatiquement par le serveur en arrière-plan. Chaque compte affiche son solde en temps réel et intègre son propre module de transfert direct.</p>
+            <h3>📂 Mes Comptes Actifs</h3>
+            <p style="color: #94a3b8; font-size: 0.9em;">Générez ou visualisez vos comptes. Chaque compte affiche son solde en temps réel et dispose de son propre espace d'envoi intégré.</p>
             <button onclick="createWallet()">👤 Créer un Nouveau Compte</button>
-        </div>
-
-        <div class="card">
-            <h3>💼 Vos Comptes Actifs & Transferts</h3>
-            <div id="accountsList"><p style="color: #64748b; text-align: center; margin-top: 20px;">Aucun compte créé pour le moment.</p></div>
-            <div id="statusMsg" class="mono" style="margin-top: 15px; text-align: center; color: #38bdf8;"></div>
+            <div id="accountsList"></div>
+            <div id="statusMsg" class="mono" style="margin-top: 10px; color: #38bdf8; text-align: center;"></div>
         </div>
     </div>
 
@@ -241,7 +237,7 @@ fn main() {
         
         let wallets = getWallets();
         wallets.push({
-            name: `Compte Actif #${wallets.length + 1}`,
+            name: `Compte #${wallets.length + 1}`,
             address: data.address,
             privKey: data.private_key
         });
@@ -262,32 +258,27 @@ fn main() {
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <b>${w.name}</b> <span class="badge">ACTIF</span>
                 </div>
-                <p style="margin: 8px 0;">Solde Actuel : <span class="balance">${data.balance} UMB</span></p>
-                <p style="margin: 4px 0;">Adresse Publique : <br><span class="mono">${w.address}</span></p>
+                <p style="margin: 8px 0;">Solde : <span class="balance">${data.balance} UMB</span></p>
+                <p style="margin: 4px 0;">Adresse : <br><span class="mono">${w.address}</span></p>
                 <p style="margin: 4px 0;">Clé Privée : <br><span class="mono" style="color: #f43f5e;">${w.privKey}</span></p>
                 
                 <div class="transfer-section">
-                    <h4 style="margin: 0 0 10px 0; color: #38bdf8;">💸 Envoyer des UMB depuis ce compte</h4>
-                    <label style="font-size: 0.9em; color: #94a3b8;">Adresse du destinataire :</label>
-                    <input type="text" id="to_${i}" placeholder="Collez l'adresse publique du destinataire">
-                    <label style="font-size: 0.9em; color: #94a3b8;">Montant à envoyer :</label>
+                    <h4 style="margin: 5px 0; color: #38bdf8;">💸 Envoyer depuis ce compte</h4>
+                    <label style="font-size: 0.85em;">Destinataire (Adresse) :</label>
+                    <input type="text" id="to_${i}" placeholder="Adresse publique du destinataire">
+                    <label style="font-size: 0.85em;">Montant (UMB) :</label>
                     <input type="number" id="amount_${i}" value="25">
-                    <button style="background: #10b981; margin: 0;" onclick="sendTxFrom('${w.privKey}', ${i})">🚀 Envoyer les UMB</button>
+                    <button style="margin: 0; background: #059669;" onclick="sendTx('${w.privKey}', ${i})">🚀 Envoyer</button>
                 </div>
             </div>`;
         }
-        document.getElementById('accountsList').innerHTML = html || '<p style="color: #64748b; text-align: center; margin-top: 20px;">Aucun compte créé pour le moment.</p>';
+        document.getElementById('accountsList').innerHTML = html || '<p style="color: #64748b; text-align: center; margin-top: 20px;">Aucun compte créé pour le moment. Cliquez sur le bouton ci-dessus !</p>';
     }
 
-    async function sendTxFrom(privKey, index) {
+    async function sendTx(privKey, index) {
         let to = document.getElementById(`to_${index}`).value;
         let amount = document.getElementById(`amount_${index}`).value;
         
-        if (!to) {
-            alert("Veuillez renseigner l'adresse du destinataire !");
-            return;
-        }
-
         let res = await fetch(`/api/send?priv=${encodeURIComponent(privKey)}&to=${encodeURIComponent(to)}&amount=${amount}`);
         let data = await res.json();
         document.getElementById('statusMsg').innerText = data.message;
@@ -305,13 +296,3 @@ fn main() {
         let _ = request.respond(response);
     }
 }
-```
-
-### Pousse les modifications sur GitHub :
-```powershell
-git add src/main.rs
-git commit -m "Suppression de l'espace mineur manuel et ajout des comptes actifs avec formulaires de transfert intégrés"
-git push -u origin main --force
-```
-
-Le code est épuré, tout tourne de manière autonome via le serveur, et chaque utilisateur gère ses envois directement depuis sa propre carte de compte actif !
