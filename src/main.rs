@@ -1,8 +1,10 @@
-use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Signer, Verifier};
+use ed25519_dalek::{SigningKey, VerifyingKey, Signer};
 use rand::rngs::OsRng;
 use sha2::{Sha256, Digest};
 use serde::{Serialize, Deserialize};
 use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 use tiny_http::{Server, Response};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -95,8 +97,22 @@ impl Blockchain {
 
 fn main() {
     let blockchain = Arc::new(Mutex::new(Blockchain::new()));
+
+    // ⛏️ Minage automatique en arrière-plan toutes les 30 secondes
+    let bc_clone = Arc::clone(&blockchain);
+    thread::spawn(move || {
+        loop {
+            thread::sleep(Duration::from_secs(30));
+            let mut bc = bc_clone.lock().unwrap();
+            // Adresse par défaut du système si aucun mineur spécifié
+            let default_miner = "umbra_system_autofaucet_address";
+            bc.mine_pending_transactions(default_miner);
+            println!("🔄 [Automatique] Un nouveau bloc a été miné par le serveur !");
+        }
+    });
+
     let server = Server::http("0.0.0.0:8080").unwrap();
-    println!("🚀 Nœud Umbra en ligne sur le port 8080 !");
+    println!("🚀 Nœud Umbra en ligne sur le port 8080 ! Minage auto actif.");
 
     for request in server.incoming_requests() {
         let url = request.url().to_string();
@@ -150,8 +166,8 @@ fn main() {
                     let kv_arr: Vec<&str> = kv.split('=').collect();
                     if kv_arr.len() == 2 {
                         let val = urlencoding::decode(kv_arr[1]).unwrap_or_default().into_owned();
-                        if kv_arr[0] == "priv" { priv_key_hex = val; }
-                        if kv_arr[0] == "to" { recipient = val; }
+                        if kv_arr[0] == "priv" { priv_key_hex = val.clone(); }
+                        if kv_arr[0] == "to" { recipient = val.clone(); }
                         if kv_arr[0] == "amount" { amount = val.parse().unwrap_or(0); }
                     }
                 }
@@ -219,7 +235,7 @@ fn main() {
         
         <div class="card">
             <h3>📂 Gestion des Comptes & Espaces Privés</h3>
-            <p style="color: #94a3b8; font-size: 0.9em;">Créez des comptes utilisateurs ou des nœuds de minage distincts. Leurs clés et adresses restent sauvegardées en permanence.</p>
+            <p style="color: #94a3b8; font-size: 0.9em;">Créez des comptes utilisateurs ou des nœuds de minage distincts. Le minage automatique tourne toutes les 30s en arrière-plan.</p>
             <div style="display: flex; gap: 10px;">
                 <button onclick="createWallet('user')">👤 Créer un Compte Utilisateur</button>
                 <button onclick="createWallet('miner')" class="btn-miner">⛏️ Créer un Compte Mineur</button>
