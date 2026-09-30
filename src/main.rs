@@ -71,7 +71,7 @@ impl Blockchain {
         let prev_block = self.chain.last().unwrap();
         let mut txs = self.pending_transactions.clone();
         
-        // Récompense de minage pour le mineur
+        // Récompense de minage automatique pour le serveur
         txs.push(Transaction {
             sender: "SYSTEM_REWARD".to_string(),
             recipient: miner_address.to_string(),
@@ -98,15 +98,14 @@ impl Blockchain {
 fn main() {
     let blockchain = Arc::new(Mutex::new(Blockchain::new()));
 
-    // ⛏️ Minage automatique en arrière-plan toutes les 30 secondes
+    // ⛏️ Minage automatique en arrière-plan toutes les 30 secondes par le serveur
     let bc_clone = Arc::clone(&blockchain);
     thread::spawn(move || {
         loop {
             thread::sleep(Duration::from_secs(30));
             let mut bc = bc_clone.lock().unwrap();
-            // Adresse par défaut du système si aucun mineur spécifié
-            let default_miner = "umbra_system_autofaucet_address";
-            bc.mine_pending_transactions(default_miner);
+            let server_miner = "umbra_system_autofaucet_address";
+            bc.mine_pending_transactions(server_miner);
             println!("🔄 [Automatique] Un nouveau bloc a été miné par le serveur !");
         }
     });
@@ -140,17 +139,6 @@ fn main() {
             };
             let json = format!(r#"{{"balance": {}}}"#, balance);
             let response = Response::from_string(json).with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap());
-            let _ = request.respond(response);
-            continue;
-        }
-
-        if url.starts_with("/api/mine") {
-            let parts: Vec<&str> = url.split("?miner=").collect();
-            let miner = if parts.len() > 1 { parts[1] } else { "miner_default" };
-            let mut bc = blockchain.lock().unwrap();
-            bc.mine_pending_transactions(miner);
-            let response = Response::from_string(r#"{"status": "success", "message": "Bloc miné avec succès ! 50 UMB de récompense versés."}"#)
-                .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap());
             let _ = request.respond(response);
             continue;
         }
@@ -194,7 +182,7 @@ fn main() {
                         let mut bc = blockchain.lock().unwrap();
                         bc.pending_transactions.push(tx);
 
-                        let resp = Response::from_string(r#"{"status": "success", "message": "Transaction ajoutée à la file d'attente !"}"#);
+                        let resp = Response::from_string(r#"{"status": "success", "message": "Transaction ajoutée et en attente de minage automatique !"}"#);
                         let _ = request.respond(resp);
                         continue;
                     }
@@ -215,18 +203,14 @@ fn main() {
         .container { max-width: 900px; margin: auto; }
         h1 { color: #38bdf8; text-align: center; margin-bottom: 30px; }
         .card { background: #1e293b; border: 1px solid #334155; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        input, select, button { width: 100%; padding: 12px; margin-top: 8px; margin-bottom: 15px; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 6px; box-sizing: border-box; }
+        input, button { width: 100%; padding: 12px; margin-top: 8px; margin-bottom: 15px; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 6px; box-sizing: border-box; }
         button { background: #0284c7; font-weight: bold; cursor: pointer; transition: background 0.2s; }
         button:hover { background: #0369a1; }
-        .btn-miner { background: #10b981; }
-        .btn-miner:hover { background: #059669; }
-        .account-box { background: #0f172a; border: 1px solid #3b82f6; padding: 15px; border-radius: 8px; margin-top: 15px; }
-        .miner-box { border-color: #10b981; background: #064e3b22; }
+        .account-box { background: #0f172a; border: 1px solid #3b82f6; padding: 20px; border-radius: 8px; margin-top: 20px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); }
         .mono { font-family: monospace; font-size: 0.85em; color: #38bdf8; word-break: break-all; }
-        .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75em; font-weight: bold; }
-        .badge-user { background: #0284c7; color: white; }
-        .badge-miner { background: #10b981; color: white; }
-        .balance { font-size: 1.2em; color: #34d399; font-weight: bold; }
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75em; font-weight: bold; background: #0284c7; color: white; }
+        .balance { font-size: 1.3em; color: #34d399; font-weight: bold; }
+        .transfer-section { margin-top: 15px; border-top: 1px dashed #334155; padding-top: 15px; }
     </style>
 </head>
 <body>
@@ -234,45 +218,34 @@ fn main() {
         <h1>🌑 Umbra Blockchain - Dashboard</h1>
         
         <div class="card">
-            <h3>📂 Gestion des Comptes & Espaces Privés</h3>
-            <p style="color: #94a3b8; font-size: 0.9em;">Créez des comptes utilisateurs ou des nœuds de minage distincts. Le minage automatique tourne toutes les 30s en arrière-plan.</p>
-            <div style="display: flex; gap: 10px;">
-                <button onclick="createWallet('user')">👤 Créer un Compte Utilisateur</button>
-                <button onclick="createWallet('miner')" class="btn-miner">⛏️ Créer un Compte Mineur</button>
-            </div>
-            <div id="accountsList"></div>
+            <h3>📂 Gestion des Comptes Actifs</h3>
+            <p style="color: #94a3b8; font-size: 0.9em;">Créez ou gérez votre compte utilisateur. Le minage s'effectue automatiquement par le serveur en arrière-plan. Chaque compte affiche son solde en temps réel et intègre son propre module de transfert direct.</p>
+            <button onclick="createWallet()">👤 Créer un Nouveau Compte</button>
         </div>
 
         <div class="card">
-            <h3>💸 Effectuer un Transfert UMB</h3>
-            <label>Clé Privée de l'expéditeur :</label>
-            <input type="text" id="sendPriv" placeholder="Sélectionnez un compte ci-dessus ou collez la clé">
-            <label>Adresse du destinataire :</label>
-            <input type="text" id="sendTo" placeholder="Adresse publique du destinataire">
-            <label>Montant :</label>
-            <input type="number" id="sendAmount" value="25">
-            <button onclick="sendTx()">🚀 Envoyer les UMB</button>
-            <div id="statusMsg" class="mono" style="margin-top: 10px; color: #38bdf8;"></div>
+            <h3>💼 Vos Comptes Actifs & Transferts</h3>
+            <div id="accountsList"><p style="color: #64748b; text-align: center; margin-top: 20px;">Aucun compte créé pour le moment.</p></div>
+            <div id="statusMsg" class="mono" style="margin-top: 15px; text-align: center; color: #38bdf8;"></div>
         </div>
     </div>
 
 <script>
     function getWallets() {
-        return JSON.parse(localStorage.getItem('umbra_wallets_v2') || '[]');
+        return JSON.parse(localStorage.getItem('umbra_wallets_v3') || '[]');
     }
 
-    async function createWallet(type) {
+    async function createWallet() {
         let res = await fetch('/api/create_wallet');
         let data = await res.json();
         
         let wallets = getWallets();
         wallets.push({
-            name: type === 'miner' ? `Nœud Mineur #${wallets.filter(w=>w.type==='miner').length + 1}` : `Compte #${wallets.filter(w=>w.type==='user').length + 1}`,
-            type: type,
+            name: `Compte Actif #${wallets.length + 1}`,
             address: data.address,
             privKey: data.private_key
         });
-        localStorage.setItem('umbra_wallets_v2', JSON.stringify(wallets));
+        localStorage.setItem('umbra_wallets_v3', JSON.stringify(wallets));
         loadWalletsUI();
     }
 
@@ -285,44 +258,37 @@ fn main() {
             let res = await fetch(`/api/balance?address=${w.address}`);
             let data = await res.json();
             
-            let badge = w.type === 'miner' ? '<span class="badge badge-miner">MINEUR</span>' : '<span class="badge badge-user">UTILISATEUR</span>';
-            let boxClass = w.type === 'miner' ? 'account-box miner-box' : 'account-box';
-            
-            html += `<div class="${boxClass}">
+            html += `<div class="account-box">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <b>${w.name}</b> ${badge}
+                    <b>${w.name}</b> <span class="badge">ACTIF</span>
                 </div>
-                <p style="margin: 8px 0;">Solde : <span class="balance">${data.balance} UMB</span></p>
-                <p style="margin: 4px 0;">Adresse : <br><span class="mono">${w.address}</span></p>
+                <p style="margin: 8px 0;">Solde Actuel : <span class="balance">${data.balance} UMB</span></p>
+                <p style="margin: 4px 0;">Adresse Publique : <br><span class="mono">${w.address}</span></p>
                 <p style="margin: 4px 0;">Clé Privée : <br><span class="mono" style="color: #f43f5e;">${w.privKey}</span></p>
                 
-                <div style="display: flex; gap: 10px; margin-top: 10px;">
-                    <button style="margin:0; background: #334155;" onclick="selectForSend('${w.privKey}')">Utiliser pour envoyer</button>
-                    ${w.type === 'miner' ? `<button style="margin:0;" class="btn-miner" onclick="mineBlock('${w.address}')">⛏️ Miner un bloc (Gagner 50 UMB)</button>` : ''}
+                <div class="transfer-section">
+                    <h4 style="margin: 0 0 10px 0; color: #38bdf8;">💸 Envoyer des UMB depuis ce compte</h4>
+                    <label style="font-size: 0.9em; color: #94a3b8;">Adresse du destinataire :</label>
+                    <input type="text" id="to_${i}" placeholder="Collez l'adresse publique du destinataire">
+                    <label style="font-size: 0.9em; color: #94a3b8;">Montant à envoyer :</label>
+                    <input type="number" id="amount_${i}" value="25">
+                    <button style="background: #10b981; margin: 0;" onclick="sendTxFrom('${w.privKey}', ${i})">🚀 Envoyer les UMB</button>
                 </div>
             </div>`;
         }
         document.getElementById('accountsList').innerHTML = html || '<p style="color: #64748b; text-align: center; margin-top: 20px;">Aucun compte créé pour le moment.</p>';
     }
 
-    function selectForSend(priv) {
-        document.getElementById('sendPriv').value = priv;
-        alert("Clé privée injectée dans le formulaire d'envoi !");
-    }
-
-    async function sendTx() {
-        let priv = document.getElementById('sendPriv').value;
-        let to = document.getElementById('sendTo').value;
-        let amount = document.getElementById('sendAmount').value;
+    async function sendTxFrom(privKey, index) {
+        let to = document.getElementById(`to_${index}`).value;
+        let amount = document.getElementById(`amount_${index}`).value;
         
-        let res = await fetch(`/api/send?priv=${encodeURIComponent(priv)}&to=${encodeURIComponent(to)}&amount=${amount}`);
-        let data = await res.json();
-        document.getElementById('statusMsg').innerText = data.message;
-        loadWalletsUI();
-    }
+        if (!to) {
+            alert("Veuillez renseigner l'adresse du destinataire !");
+            return;
+        }
 
-    async function mineBlock(minerAddress) {
-        let res = await fetch(`/api/mine?miner=${minerAddress}`);
+        let res = await fetch(`/api/send?priv=${encodeURIComponent(privKey)}&to=${encodeURIComponent(to)}&amount=${amount}`);
         let data = await res.json();
         document.getElementById('statusMsg').innerText = data.message;
         loadWalletsUI();
@@ -339,3 +305,13 @@ fn main() {
         let _ = request.respond(response);
     }
 }
+```
+
+### Pousse les modifications sur GitHub :
+```powershell
+git add src/main.rs
+git commit -m "Suppression de l'espace mineur manuel et ajout des comptes actifs avec formulaires de transfert intégrés"
+git push -u origin main --force
+```
+
+Le code est épuré, tout tourne de manière autonome via le serveur, et chaque utilisateur gère ses envois directement depuis sa propre carte de compte actif !
